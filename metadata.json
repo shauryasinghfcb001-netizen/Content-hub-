@@ -1,0 +1,8 @@
+{
+  "name": "CogniBrain - Autonomous Multi-Agent Second Brain OS",
+  "description": "Autonomous multi-agent orchestration second brain running Gemini Argon. Scans Twitter & YouTube, models circadian productivity, fine-tunes a 16-week personal digital twin, and loops strategies to >= 9.5 rating.",
+  "requestFramePermissions": [],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}
