@@ -33,6 +33,7 @@ import {
 import {
   generateSessionTelemetryTrend,
   buildHarnessExecutionTrace,
+  getIntendedFutureIntegrations,
 } from '../utils/cogniLogic';
 
 interface SwarmDeckProps {
@@ -220,6 +221,58 @@ export const SwarmDeck: React.FC<SwarmDeckProps> = ({
           </button>
         </div>
       </section>
+
+      {/* P0 Honest Status Banner: SwarmDeck Simulation Notice */}
+      <div
+        data-testid="swarm-simulation-banner"
+        className="p-4 rounded-xl bg-amber-500/10 border border-amber-500/30 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs font-mono-studio text-amber-200"
+      >
+        <div>
+          <span className="px-2 py-0.5 rounded bg-amber-500/20 text-amber-300 font-bold mr-2 uppercase">
+            SIMULATION / DEMO
+          </span>
+          <strong>Honest Status Label:</strong> SwarmDeck traces, subagent roles, tool names, and latency numbers are simulated demo outputs until real agent runs are wired.
+        </div>
+        <span className="text-[10px] text-amber-300/80 uppercase shrink-0">
+          STATUS: SIMULATION / DEMO
+        </span>
+      </div>
+
+      {/* P0 Future Integrations Row (Jarvis, Codex/ChatGPT, Claude, MiniMe, Hermes) */}
+      <div
+        data-testid="future-integrations-row"
+        className="p-4 rounded-2xl bg-[#070707] border border-white/[0.08] space-y-3"
+      >
+        <div className="flex flex-wrap items-center justify-between gap-2 text-xs font-mono-studio">
+          <span className="font-bold text-white uppercase tracking-wider">
+            Future Vision Integrations (Intended · Not Connected)
+          </span>
+          <span className="text-[11px] text-amber-300">
+            Mock/simulated output never counts as connected — each awaits your explicit go-ahead
+          </span>
+        </div>
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-2.5">
+          {getIntendedFutureIntegrations().map((integ) => (
+            <div
+              key={integ.id}
+              className="p-3 rounded-xl bg-black border border-white/[0.07] space-y-1 font-mono-studio"
+            >
+              <div className="flex items-center justify-between gap-1">
+                <span className="text-xs font-bold text-white">{integ.name}</span>
+                <span className="px-1.5 py-0.5 rounded bg-amber-500/15 text-amber-300 border border-amber-500/30 text-[9px] uppercase font-bold">
+                  Not Connected
+                </span>
+              </div>
+              <p className="text-[10px] text-neutral-400 leading-snug">
+                {integ.roleDescription}
+              </p>
+              <div className="text-[9px] text-neutral-500 uppercase pt-0.5">
+                {integ.statusLabel}
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
 
       {/* =====================================================================
           SECTION 01: CLAUDE / CODEX STYLE AGENT HARNESS CONSOLE

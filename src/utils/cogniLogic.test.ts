@@ -14,6 +14,13 @@ import {
   generateSessionTelemetryTrend,
   executeMCPToolCall,
   buildHarnessExecutionTrace,
+  getIntendedFutureIntegrations,
+  evaluateSourceUrlDedup,
+  parseSeedScriptsMarkdown,
+  sortReelQueueItems,
+  exportWeeklyResultsMarkdown,
+  estimateLocalStorageBytes,
+  validateWorkspaceBackupSchema,
   ProjectItem,
 } from './cogniLogic';
 
@@ -311,3 +318,218 @@ test('buildHarnessExecutionTrace generates 4-step agent harness trace with Notio
   assert.equal(steps[0].agentOrServer, 'MCP · Notion');
   assert.equal(steps[3].status, 'verified');
 });
+
+test('getIntendedFutureIntegrations returns all 5 future integrations marked intended_not_connected', () => {
+  const list = getIntendedFutureIntegrations();
+  assert.equal(list.length, 5);
+  const ids = list.map((i) => i.id);
+  assert.deepEqual(ids, ['jarvis', 'codex', 'claude', 'minime', 'hermes']);
+  for (const item of list) {
+    assert.equal(item.status, 'intended_not_connected');
+    assert.equal(item.statusLabel, 'Intended · Not Connected');
+  }
+});
+
+test('evaluateSourceUrlDedup flags exact same URL re-paste while allowing linked multi-angles', () => {
+  const existingInbox = [
+    {
+      id: 'src-item-1',
+      sourceName: 'Manual Capture',
+      platform: 'YouTube' as const,
+      url: 'https://youtube.com/watch?v=abc123/',
+      note: 'First capture note',
+      capturedAt: '2026-10-30',
+      isDuplicateUrl: false,
+    },
+  ];
+  const existingIdeas = [
+    {
+      id: 'idea-1',
+      title: 'Angle 1: Local harness architecture',
+      format: 'reel' as const,
+      sourceUrl: 'https://youtube.com/watch?v=abc123',
+      sourceName: 'Manual Capture',
+      dateCaptured: '2026-10-30',
+      whatWasTaken: 'Architecture breakdown',
+      checkDone: 'Checked repo structure',
+      checkDate: '2026-10-30',
+      status: 'approved' as const,
+      isDuplicateSourceUrl: false,
+      angleIndex: 1,
+      linkedIdeaIds: [],
+    },
+  ];
+
+  // Exact same URL (even with trailing slash or uppercase) is flagged
+  const dupCheck = evaluateSourceUrlDedup(
+    'HTTPS://youtube.com/watch?v=abc123',
+    existingInbox,
+    existingIdeas
+  );
+  assert.equal(dupCheck.isDuplicateInInbox, true);
+  assert.equal(dupCheck.matchingInboxItemId, 'src-item-1');
+  assert.equal(dupCheck.isDuplicateInIdeas, true);
+  assert.deepEqual(dupCheck.matchingIdeaIds, ['idea-1']);
+  assert.equal(dupCheck.nextAngleIndex, 2);
+
+  // Distinct URL is not flagged
+  const freshCheck = evaluateSourceUrlDedup(
+    'https://x.com/example/status/999',
+    existingInbox,
+    existingIdeas
+  );
+  assert.equal(freshCheck.isDuplicateInInbox, false);
+  assert.equal(freshCheck.isDuplicateInIdeas, false);
+  assert.equal(freshCheck.nextAngleIndex, 1);
+});
+
+test('parseSeedScriptsMarkdown preserves draft status and [needs tool run] / [needs source check] flags', () => {
+  const sampleMarkdown = `
+# Why Unbounded Agent Loops Fail [draft] [needs tool run]
+Format: reel
+Hook: If your AI critic scores its own homework 9.9/10, it is lying to you.
+Script: Most agent loops have no hard cap. Cap your critique loop at 3 passes max and verify real outputs.
+Checked: Verified against 3-pass cap test suite
+Avoid: Do not claim a 9.5 score is formal proof
+
+---
+
+# 6-Slide Breakdown: Local-First Second Brain [carousel] [needs source check]
+Hook: Stop putting your entire workflow behind an unverified cloud wrapper.
+Script: Carousel walkthrough of local-first JSON backup + manual source provenance.
+- Slide 1: Cover Hook | Local-first beats black-box automation
+- Slide 2: Provenance | Track source URL, what was taken, and check date
+Checked: Pending source check on browser storage quota
+Avoid: Do not claim unlimited browser storage
+`;
+
+  const parsed = parseSeedScriptsMarkdown(sampleMarkdown, 6, 60);
+  assert.equal(parsed.length, 2);
+
+  assert.equal(parsed[0].title, 'Why Unbounded Agent Loops Fail');
+  assert.equal(parsed[0].status, 'draft');
+  assert.equal(parsed[0].isSeedDraft, true);
+  assert.equal(parsed[0].needsToolRun, true);
+  assert.equal(parsed[0].needsSourceCheck, false);
+  assert.match(parsed[0].avoid, /formal proof/i);
+
+  assert.equal(parsed[1].title, '6-Slide Breakdown: Local-First Second Brain');
+  assert.equal(parsed[1].format, 'carousel');
+  assert.equal(parsed[1].status, 'draft');
+  assert.equal(parsed[1].isSeedDraft, true);
+  assert.equal(parsed[1].needsSourceCheck, true);
+  assert.equal(parsed[1].carouselSlides.length, 2);
+});
+
+test('sortReelQueueItems places Today Priority first and keeps blocked items visible with reason', () => {
+  const queue = [
+    {
+      id: 'q1',
+      scriptId: 's1',
+      title: 'Blocked Demo Reel',
+      format: 'reel' as const,
+      stage: 'blocked' as const,
+      isTodayPriority: false,
+      blockedReason: 'Waiting on local tool run verification',
+      needsToolRun: true,
+      needsSourceCheck: false,
+      scheduledDate: '2026-10-30',
+      notes: '',
+    },
+    {
+      id: 'q2',
+      scriptId: 's2',
+      title: 'Today Priority Reel #1',
+      format: 'reel' as const,
+      stage: 'to_shoot' as const,
+      isTodayPriority: true,
+      blockedReason: '',
+      needsToolRun: false,
+      needsSourceCheck: false,
+      scheduledDate: '2026-10-30',
+      notes: '',
+    },
+  ];
+
+  const sorted = sortReelQueueItems(queue);
+  assert.equal(sorted.length, 2, 'Blocked item must never be dropped');
+  assert.equal(sorted[0].id, 'q2', 'Today priority item comes first');
+  assert.equal(sorted[1].id, 'q1');
+  assert.equal(sorted[1].blockedReason, 'Waiting on local tool run verification');
+});
+
+test('exportWeeklyResultsMarkdown & validateWorkspaceBackupSchema round-trip cleanly', () => {
+  const cadence = {
+    dailyReelsTarget: 1,
+    sprintDays: 30,
+    dailyCarouselsTarget: 2,
+    carouselsTermConfirmed: false,
+    weeklyLongVideosMin: 2,
+    weeklyLongVideosMax: 3,
+    defaultReelDurationSec: 60,
+    defaultCarouselSlidesCount: 6,
+    secondCarouselPattern: 'Carousel #2: Rapid Checklist',
+    xClipDestinationNote: 'Unsettled after LinkedIn retraction',
+    llmConnectorEnabled: false,
+  };
+
+  const md = exportWeeklyResultsMarkdown(
+    [
+      {
+        id: 'res-1',
+        title: 'Day 1 Original Reel',
+        format: 'reel',
+        postedDate: '2026-10-30',
+        views: 1200,
+        likes: 95,
+        comments: 14,
+        sends: 28,
+        notes: 'Strong retention on 3-pass cap hook',
+      },
+    ],
+    cadence
+  );
+  assert.match(md, /1,200/);
+  assert.match(md, /Read from "consoles" — pending confirmation/);
+
+  const validBackup = JSON.stringify({
+    schemaVersion: 'cognibrain-backup-v1',
+    exportedAt: '2026-10-30T10:00:00Z',
+    projects: [],
+    priorityProjectId: 'proj-1',
+    projectMilestones: {},
+    routine: {
+      wakeHour: 7,
+      sleepHour: 23,
+      morningPeakStart: 9,
+      morningPeakEnd: 12,
+      slumpStart: 13,
+      slumpEnd: 15,
+      eveningPeakStart: 16,
+      eveningPeakEnd: 19,
+    },
+    habitLogs: [],
+    reelHub: {
+      sources: [],
+      sourceItems: [],
+      ideas: [],
+      scripts: [],
+      queue: [],
+      results: [],
+      cadenceConfig: cadence,
+    },
+  });
+
+  const checkValid = validateWorkspaceBackupSchema(validBackup);
+  assert.equal(checkValid.valid, true);
+  assert.equal(checkValid.payload?.schemaVersion, 'cognibrain-backup-v1');
+
+  const checkInvalid = validateWorkspaceBackupSchema('{"schemaVersion": "wrong"}');
+  assert.equal(checkInvalid.valid, false);
+  assert.match(checkInvalid.error || '', /schemaVersion/);
+
+  const storageEst = estimateLocalStorageBytes({ key1: validBackup });
+  assert.ok(storageEst.usedBytes > 100);
+  assert.equal(storageEst.limitKB, 5120);
+});
+

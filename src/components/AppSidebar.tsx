@@ -13,6 +13,7 @@ import {
   X,
   Database,
   Clock,
+  Film,
 } from 'lucide-react';
 
 interface AppSidebarProps {
@@ -29,7 +30,6 @@ interface AppSidebarProps {
 export const AppSidebar: React.FC<AppSidebarProps> = ({
   currentTab,
   onSelectTab,
-  calibration,
   onOpenParallelModal,
   onOpenCommandPalette,
   isDispatching,
@@ -47,7 +47,7 @@ export const AppSidebar: React.FC<AppSidebarProps> = ({
     }>;
   }> = [
     {
-      title: '01. CORE WORKFLOW',
+      title: '01. CORE WORKFLOW (LIVE LOCAL)',
       items: [
         {
           id: 'focus',
@@ -68,32 +68,22 @@ export const AppSidebar: React.FC<AppSidebarProps> = ({
           label: 'Routine & Windows',
           shortcut: '3',
           icon: <Clock className="w-4 h-4" />,
-          badge: '24h',
+          badge: 'Display',
         },
-      ],
-    },
-    {
-      title: '02. AGENT HARNESS & MCP',
-      items: [
         {
-          id: 'swarm',
-          label: 'Agent Harness',
+          id: 'reels',
+          label: 'Reel Hub Pipeline',
           shortcut: '4',
-          icon: <BrainCircuit className="w-4 h-4" />,
-          badge: 'Console',
+          icon: <Film className="w-4 h-4" />,
+          badge: 'Module',
         },
         {
-          id: 'mcp',
-          label: 'MCP & Notion Bridge',
+          id: 'habits',
+          label: 'Habit Logger',
           shortcut: '5',
-          icon: <Database className="w-4 h-4" />,
-          badge: 'Notion',
+          icon: <Activity className="w-4 h-4" />,
+          badge: 'Manual',
         },
-      ],
-    },
-    {
-      title: '03. SANDBOX & TELEMETRY',
-      items: [
         {
           id: 'loop',
           label: 'Critique Checklist',
@@ -101,26 +91,38 @@ export const AppSidebar: React.FC<AppSidebarProps> = ({
           icon: <Flame className="w-4 h-4" />,
           badge: 'Cap 3',
         },
+      ],
+    },
+    {
+      title: '02. SIMULATION / DEMO PREVIEWS',
+      items: [
         {
-          id: 'habits',
-          label: 'Habit Logger',
+          id: 'swarm',
+          label: 'Agent Harness',
           shortcut: '7',
-          icon: <Activity className="w-4 h-4" />,
-          badge: 'Log',
+          icon: <BrainCircuit className="w-4 h-4" />,
+          badge: 'Sim/Demo',
+        },
+        {
+          id: 'mcp',
+          label: 'MCP & Notion',
+          shortcut: '8',
+          icon: <Database className="w-4 h-4" />,
+          badge: 'Sim/Demo',
         },
         {
           id: 'twin',
           label: 'Persona Sandbox',
-          shortcut: '8',
+          shortcut: '9',
           icon: <Sparkles className="w-4 h-4" />,
-          badge: `${calibration.digitalTwinFidelityScore}% Est.`,
+          badge: 'Concept',
         },
         {
           id: 'scout',
           label: 'Research Radar',
-          shortcut: '9',
+          shortcut: '0',
           icon: <Radio className="w-4 h-4" />,
-          badge: 'Sim',
+          badge: 'Sim/Demo',
         },
       ],
     },
@@ -147,7 +149,7 @@ export const AppSidebar: React.FC<AppSidebarProps> = ({
                 CogniBrain Harness
               </div>
               <div className="text-[10px] font-mono-studio text-neutral-400">
-                Priority · MCP · Routine
+                Execution · Reel Hub · MCP
               </div>
             </div>
           </div>
@@ -187,7 +189,7 @@ export const AppSidebar: React.FC<AppSidebarProps> = ({
         </div>
 
         {/* Sectioned Navigation Rail */}
-        <nav className="px-3 space-y-4 pb-4">
+        <nav className="px-3 space-y-4 pb-3">
           {navSections.map((section) => (
             <div key={section.title} className="space-y-1">
               <div className="px-2 py-1 text-[10px] font-mono-studio uppercase text-neutral-500 tracking-wider">
@@ -200,8 +202,9 @@ export const AppSidebar: React.FC<AppSidebarProps> = ({
                   <button
                     type="button"
                     key={item.id}
+                    data-testid={`nav-${item.id}`}
                     onClick={() => handleNavClick(item.id)}
-                    className={`w-full flex items-center justify-between px-3 py-2 rounded-xl text-xs font-mono-studio transition-all min-h-[40px] ${
+                    className={`w-full flex items-center justify-between px-3 py-2 rounded-xl text-xs font-mono-studio transition-all min-h-[38px] ${
                       isActive
                         ? 'bg-white text-black font-bold shadow-md shadow-white/5'
                         : 'text-neutral-400 hover:text-white hover:bg-white/[0.04]'
@@ -240,6 +243,25 @@ export const AppSidebar: React.FC<AppSidebarProps> = ({
             </div>
           ))}
         </nav>
+
+        {/* Future Integrations (Intended · Not Connected) */}
+        <div className="px-3 pb-3">
+          <div className="p-2.5 rounded-xl bg-black border border-white/[0.07] space-y-1.5 font-mono-studio">
+            <div className="text-[9px] uppercase tracking-wider text-amber-400 font-bold">
+              INTENDED · NOT CONNECTED YET
+            </div>
+            <div className="flex flex-wrap gap-1 text-[10px] text-neutral-400">
+              {['Jarvis', 'Codex/ChatGPT', 'Claude', 'MiniMe', 'Hermes'].map((name) => (
+                <span
+                  key={name}
+                  className="px-1.5 py-0.5 rounded bg-white/[0.04] border border-white/[0.08]"
+                >
+                  {name}
+                </span>
+              ))}
+            </div>
+          </div>
+        </div>
       </div>
 
       {/* Footer / CTA */}
@@ -254,15 +276,15 @@ export const AppSidebar: React.FC<AppSidebarProps> = ({
           className="w-full py-2.5 px-4 rounded-xl bg-white text-black hover:bg-neutral-200 text-xs font-mono-studio font-bold uppercase tracking-wider flex items-center justify-center space-x-2 transition-all disabled:opacity-40 min-h-[42px]"
         >
           <Zap className="w-3.5 h-3.5" />
-          <span>RUN HARNESS TRACE</span>
+          <span>HARNESS TRACE (DEMO)</span>
         </button>
 
         <div className="pt-2 border-t border-white/[0.04] flex items-center justify-between px-2 text-[11px] font-mono-studio text-neutral-400">
           <div>
             <span className="text-white block font-medium">Shaurya Singh</span>
-            <span className="text-[10px] text-neutral-500 block">Workspace Owner</span>
+            <span className="text-[10px] text-neutral-500 block">Manual-First LocalStorage</span>
           </div>
-          <span className="text-[10px] px-2 py-0.5 rounded border border-white/10 text-neutral-400">
+          <span className="text-[10px] px-2 py-0.5 rounded border border-white/10 text-emerald-400">
             LOCAL
           </span>
         </div>

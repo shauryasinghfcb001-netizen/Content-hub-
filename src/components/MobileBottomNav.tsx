@@ -5,7 +5,7 @@ import {
   Activity,
   FolderKanban,
   Target,
-  PlugZap,
+  Film,
 } from 'lucide-react';
 
 interface MobileBottomNavProps {
@@ -33,6 +33,11 @@ export const MobileBottomNav: React.FC<MobileBottomNavProps> = ({
       icon: <FolderKanban className="w-5 h-5" />,
     },
     {
+      id: 'reels',
+      label: 'Reel Hub',
+      icon: <Film className="w-5 h-5" />,
+    },
+    {
       id: 'circadian',
       label: 'Routine',
       icon: <Activity className="w-5 h-5" />,
@@ -41,11 +46,6 @@ export const MobileBottomNav: React.FC<MobileBottomNavProps> = ({
       id: 'swarm',
       label: 'Harness',
       icon: <Terminal className="w-5 h-5" />,
-    },
-    {
-      id: 'mcp',
-      label: 'Notion MCP',
-      icon: <PlugZap className="w-5 h-5" />,
     },
   ];
 

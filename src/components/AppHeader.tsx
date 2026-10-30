@@ -26,13 +26,14 @@ export const AppHeader: React.FC<AppHeaderProps> = ({
   const tabTitles: Record<TabType, string> = {
     focus: "Today's Priority & Milestones",
     projects: 'Projects Board & Priority Pipeline',
-    circadian: 'Routine & Focus Windows (24h)',
-    swarm: 'Agent & Tool Harness Console',
-    mcp: 'MCP Connectors & Notion Bridge',
+    circadian: 'Routine & Focus Windows (Scheduling Display)',
+    reels: 'Reel Hub Content Pipeline (Manual-First)',
+    swarm: 'Agent Harness Console (Simulation / Demo)',
+    mcp: 'MCP & Notion Bridge (Simulation / Demo)',
     loop: 'Capped Critique Checklist (Max 3 Passes)',
-    habits: 'Cognitive Habit Telemetry Logger',
-    twin: 'Persona Simulation & Habit Studio',
-    scout: 'AI Research & Radar Feed (Simulated)',
+    habits: 'Cognitive Habit Logger (Manual)',
+    twin: 'Persona Sandbox (Concept Preview)',
+    scout: 'Research Radar (Simulation / Demo)',
   };
 
   return (

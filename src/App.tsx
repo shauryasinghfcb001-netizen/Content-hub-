@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { AppSidebar } from './components/AppSidebar';
 import { AppHeader } from './components/AppHeader';
 import { SwarmDeck } from './components/SwarmDeck';
@@ -11,6 +11,7 @@ import { CircadianMatrix } from './components/CircadianMatrix';
 import { ScoutHub } from './components/ScoutHub';
 import { ProjectsNexus } from './components/ProjectsNexus';
 import { FocusGoal } from './components/FocusGoal';
+import { ReelHub } from './components/ReelHub';
 import { MCPHub } from './components/MCPHub';
 import { MobileBottomNav } from './components/MobileBottomNav';
 import { DigitalTwinStudio } from './components/views/DigitalTwinStudio';
@@ -32,6 +33,8 @@ import {
   UserRoutineConfig,
   MCPServerConfig,
   NotionPageItem,
+  ReelHubState,
+  CogniBrainBackupPayload,
 } from './types';
 import {
   calculateCircadianProfile,
@@ -40,6 +43,8 @@ import {
   calculateHabitTelemetryImpact,
   aggregateHabitTelemetry,
   syncProjectProgressWithMilestones,
+  estimateLocalStorageBytes,
+  validateWorkspaceBackupSchema,
 } from './utils/cogniLogic';
 
 const INITIAL_MILESTONES: Record<string, DailyFocusMilestone[]> = {
@@ -150,6 +155,142 @@ const INITIAL_ROUTINE: UserRoutineConfig = {
   eveningPeakEnd: 19,
 };
 
+const INITIAL_REEL_HUB: ReelHubState = {
+  // Explicitly empty creator list: "The creator source list is still pending; do not invent sources."
+  sources: [],
+  sourceItems: [
+    {
+      id: 'inbox-seed-1',
+      sourceName: 'Manual Link Capture',
+      platform: 'Other',
+      url: 'https://arxiv.org/abs/2610.00001',
+      note: 'Why unbounded self-critique loops inflate their own scores unless hard-capped at 3 passes.',
+      capturedAt: '2026-10-30',
+      isDuplicateUrl: false,
+    },
+  ],
+  ideas: [
+    {
+      id: 'idea-seed-1',
+      title: 'Why Unbounded Agent Loops Fail (And Why 3 Passes Is the Cap)',
+      format: 'reel',
+      sourceUrl: 'https://arxiv.org/abs/2610.00001',
+      sourceName: 'Manual Link Capture',
+      dateCaptured: '2026-10-30',
+      whatWasTaken: 'Reward hacking in self-critique loops when no iteration cap is enforced.',
+      checkDone: 'Verified against 3-pass unit test cap in cogniLogic.test.ts',
+      checkDate: '2026-10-30',
+      status: 'approved',
+      isDuplicateSourceUrl: false,
+      angleIndex: 1,
+      linkedIdeaIds: [],
+    },
+  ],
+  scripts: [
+    {
+      id: 'script-seed-1',
+      ideaId: 'idea-seed-1',
+      title: 'Why Unbounded Agent Loops Fail (3-Pass Cap)',
+      format: 'reel',
+      hook: 'If your AI agent grades its own homework 9.9/10, you built an echo chamber, not an evaluator.',
+      spokenScript:
+        '1. Unbounded self-critique loops inflate their own scores.\n2. Hard-cap your critique checklist at 3 passes max.\n3. Treat scores as planning heuristics, never formal proof.',
+      carouselSlides: [
+        { id: 'sl-1', slideNumber: 1, headline: 'Stop Unbounded Self-Critique', body: 'Why 9.9/10 self-scores are an illusion' },
+        { id: 'sl-2', slideNumber: 2, headline: 'Hard Cap at 3 Passes', body: 'Keep low-scoring drafts flagged honestly' },
+        { id: 'sl-3', slideNumber: 3, headline: 'Heuristics != Proof', body: 'Verify with real unit tests and browser checks' },
+      ],
+      status: 'ready_to_shoot',
+      checked: 'Verified against 3-pass cap test in cogniLogic.test.ts',
+      checkedDate: '2026-10-30',
+      avoid: 'Do not claim heuristic checklist scores are formal verification proof',
+      needsToolRun: false,
+      needsSourceCheck: false,
+      isSeedDraft: false,
+      targetDurationSec: 60,
+      sourceUrl: 'https://arxiv.org/abs/2610.00001',
+      updatedAt: '2026-10-30',
+    },
+    {
+      id: 'script-seed-2',
+      title: 'Local-First Second Brain Backup Walkthrough [Draft]',
+      format: 'carousel',
+      hook: 'What happens to your local-first workspace when browser storage gets cleared?',
+      spokenScript:
+        'Walkthrough of schema-validated JSON export/import so a browser reset never wipes your projects or Reel Hub.',
+      carouselSlides: [
+        { id: 'sl-21', slideNumber: 1, headline: 'LocalStorage Has a ~5 MB Cap', body: 'Know your exact byte footprint' },
+        { id: 'sl-22', slideNumber: 2, headline: 'Schema-Validated JSON Backup', body: 'Round-trip export & restore in 1 click' },
+      ],
+      status: 'draft',
+      checked: 'Pending tool run on full export/import round-trip',
+      checkedDate: '2026-10-30',
+      avoid: 'Do not claim cloud sync is active while in local-only mode',
+      needsToolRun: true,
+      needsSourceCheck: false,
+      isSeedDraft: true,
+      targetDurationSec: 60,
+      carouselPatternLabel: 'Carousel #2: Rapid Checklist / Contrarian Take',
+      updatedAt: '2026-10-30',
+    },
+  ],
+  queue: [
+    {
+      id: 'queue-seed-1',
+      scriptId: 'script-seed-1',
+      title: 'Why Unbounded Agent Loops Fail (3-Pass Cap)',
+      format: 'reel',
+      stage: 'to_shoot',
+      isTodayPriority: true,
+      blockedReason: '',
+      needsToolRun: false,
+      needsSourceCheck: false,
+      scheduledDate: '2026-10-30',
+      notes: 'Day 1 self-shot original reel (60s target)',
+    },
+    {
+      id: 'queue-seed-2',
+      scriptId: 'script-seed-2',
+      title: 'Local-First Second Brain Backup Walkthrough [Draft]',
+      format: 'carousel',
+      stage: 'blocked',
+      isTodayPriority: false,
+      blockedReason: 'Flagged: needs tool run verification of JSON backup round-trip before shoot',
+      needsToolRun: true,
+      needsSourceCheck: false,
+      scheduledDate: '2026-10-30',
+      notes: 'Blocked items remain visible inline with their reason',
+    },
+  ],
+  results: [
+    {
+      id: 'res-seed-1',
+      scriptId: 'script-seed-1',
+      title: 'Pilot Reel: Projects → Priority → Milestones Workflow',
+      format: 'reel',
+      postedDate: '2026-10-29',
+      views: 1420,
+      likes: 118,
+      comments: 19,
+      sends: 34,
+      notes: 'Manual metric entry baseline — strong saves on routine window config.',
+    },
+  ],
+  cadenceConfig: {
+    dailyReelsTarget: 1,
+    sprintDays: 30,
+    dailyCarouselsTarget: 2,
+    carouselsTermConfirmed: false,
+    weeklyLongVideosMin: 2,
+    weeklyLongVideosMax: 3,
+    defaultReelDurationSec: 60,
+    defaultCarouselSlidesCount: 6,
+    secondCarouselPattern: 'Carousel #2: Rapid Checklist / Contrarian Take',
+    xClipDestinationNote: 'Unsettled (after LinkedIn retraction) — awaiting user input',
+    llmConnectorEnabled: false,
+  },
+};
+
 const INITIAL_MCP_SERVERS: MCPServerConfig[] = [
   {
     id: 'notion',
@@ -160,7 +301,7 @@ const INITIAL_MCP_SERVERS: MCPServerConfig[] = [
     transport: 'stdio',
     endpointOrCommand: 'npx -y @modelcontextprotocol/server-notion',
     workspaceName: 'Shaurya Second Brain HQ',
-    lastSynced: '2 mins ago',
+    lastSynced: 'Simulated',
     syncedItemsCount: 24,
     tools: [
       {
@@ -189,7 +330,7 @@ const INITIAL_MCP_SERVERS: MCPServerConfig[] = [
     transport: 'stdio',
     endpointOrCommand: 'npx -y @modelcontextprotocol/server-github',
     workspaceName: 'shaurya-builds/cognibrain-kernel',
-    lastSynced: '8 mins ago',
+    lastSynced: 'Simulated',
     syncedItemsCount: 14,
     tools: [
       {
@@ -213,7 +354,7 @@ const INITIAL_MCP_SERVERS: MCPServerConfig[] = [
     transport: 'sse',
     endpointOrCommand: 'http://localhost:3000/api/mcp/gcal',
     workspaceName: 'Primary Focus Calendar',
-    lastSynced: '14 mins ago',
+    lastSynced: 'Simulated',
     syncedItemsCount: 8,
     tools: [
       {
@@ -283,8 +424,8 @@ const INITIAL_PROJECTS: ProjectItem[] = [
     progress: syncProjectProgressWithMilestones(INITIAL_MILESTONES['proj-1'], 75),
     energyRequirement: 'high_focus',
     tags: ['gemini', 'agent', 'orchestration', 'mcp'],
-    lastUpdated: '2026-10-29',
-    cogniNotes: 'Core priority pipeline: Projects → Today’s Priority → Milestones with Notion MCP sandbox.',
+    lastUpdated: '2026-10-30',
+    cogniNotes: 'Core priority pipeline: Projects → Today’s Priority → Milestones + Reel Hub module.',
   },
   {
     id: 'proj-2',
@@ -332,6 +473,61 @@ const INITIAL_PROJECTS: ProjectItem[] = [
   },
 ];
 
+const INITIAL_HABITS: CognitiveHabitLog[] = [
+  {
+    id: 'habit-1',
+    name: 'Morning Peak Multi-Agent Kernel Coding',
+    category: 'coding',
+    durationMinutes: 90,
+    timestamp: 'Today at 09:30 AM',
+    hour: 9,
+    circadianAlignment: 'peak_aligned',
+    impactFidelityDelta: 0.65,
+    qualityScore: 10,
+    notes: 'Completed 3 priority milestones with zero context switching.',
+    tags: ['coding', 'gemini', 'kernel'],
+  },
+  {
+    id: 'habit-2',
+    name: 'arXiv Paper: Episodic Memory in Long-Context LLMs',
+    category: 'reading',
+    durationMinutes: 45,
+    timestamp: 'Today at 11:15 AM',
+    hour: 11,
+    circadianAlignment: 'peak_aligned',
+    impactFidelityDelta: 0.40,
+    qualityScore: 9,
+    notes: 'Extracted key principles of episodic decay vs permanent heuristic consolidation.',
+    tags: ['reading', 'research'],
+  },
+  {
+    id: 'habit-3',
+    name: 'Slump-Window Non-Sleep Deep Rest (NSDR)',
+    category: 'rest',
+    durationMinutes: 25,
+    timestamp: 'Today at 02:15 PM',
+    hour: 14,
+    circadianAlignment: 'slump_protected',
+    impactFidelityDelta: 0.35,
+    qualityScore: 8,
+    notes: 'Quarantined incoming messages; completed recovery reset.',
+    tags: ['rest', 'recovery'],
+  },
+  {
+    id: 'habit-4',
+    name: 'Subagent Dispatch Trade-Off Reflection',
+    category: 'reflection',
+    durationMinutes: 20,
+    timestamp: 'Yesterday at 08:30 PM',
+    hour: 20,
+    circadianAlignment: 'neutral',
+    impactFidelityDelta: 0.25,
+    qualityScore: 9,
+    notes: 'Logged daily decision heuristics for priority ordering.',
+    tags: ['reflection', 'heuristics'],
+  },
+];
+
 function loadFromStorage<T>(key: string, fallback: T): T {
   try {
     const raw = localStorage.getItem(key);
@@ -375,6 +571,12 @@ export default function App() {
   const [routine, setRoutine] = useState<UserRoutineConfig>(() =>
     loadFromStorage('cognibrain_routine_v2', INITIAL_ROUTINE)
   );
+  const [habitLogs, setHabitLogs] = useState<CognitiveHabitLog[]>(() =>
+    loadFromStorage('cognibrain_habits_v2', INITIAL_HABITS)
+  );
+  const [reelHub, setReelHub] = useState<ReelHubState>(() =>
+    loadFromStorage('cognibrain_reel_hub_v1', INITIAL_REEL_HUB)
+  );
   const [mcpServers, setMcpServers] = useState<MCPServerConfig[]>(() =>
     loadFromStorage('cognibrain_mcp_servers_v2', INITIAL_MCP_SERVERS)
   );
@@ -416,6 +618,22 @@ export default function App() {
 
   useEffect(() => {
     try {
+      localStorage.setItem('cognibrain_habits_v2', JSON.stringify(habitLogs));
+    } catch (e) {
+      console.warn('Storage save note:', e);
+    }
+  }, [habitLogs]);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem('cognibrain_reel_hub_v1', JSON.stringify(reelHub));
+    } catch (e) {
+      console.warn('Storage save note:', e);
+    }
+  }, [reelHub]);
+
+  useEffect(() => {
+    try {
       localStorage.setItem('cognibrain_mcp_servers_v2', JSON.stringify(mcpServers));
     } catch (e) {
       console.warn('Storage save note:', e);
@@ -429,6 +647,61 @@ export default function App() {
       console.warn('Storage save note:', e);
     }
   }, [notionPages]);
+
+  const storageStats = useMemo(() => {
+    const snapshot: Record<string, string> = {
+      cognibrain_projects_v2: JSON.stringify(projects),
+      cognibrain_priority_project_v2: JSON.stringify(priorityProjectId),
+      cognibrain_milestones_v2: JSON.stringify(projectMilestones),
+      cognibrain_routine_v2: JSON.stringify(routine),
+      cognibrain_habits_v2: JSON.stringify(habitLogs),
+      cognibrain_reel_hub_v1: JSON.stringify(reelHub),
+      cognibrain_mcp_servers_v2: JSON.stringify(mcpServers),
+      cognibrain_notion_pages_v2: JSON.stringify(notionPages),
+    };
+    return estimateLocalStorageBytes(snapshot, 5120);
+  }, [
+    projects,
+    priorityProjectId,
+    projectMilestones,
+    routine,
+    habitLogs,
+    reelHub,
+    mcpServers,
+    notionPages,
+  ]);
+
+  const handleExportBackupJson = (): string => {
+    const payload: CogniBrainBackupPayload = {
+      schemaVersion: 'cognibrain-backup-v1',
+      exportedAt: new Date().toISOString(),
+      projects,
+      priorityProjectId,
+      projectMilestones,
+      routine,
+      habitLogs,
+      reelHub,
+    };
+    return JSON.stringify(payload, null, 2);
+  };
+
+  const handleImportBackupJson = (rawJson: string): { valid: boolean; error?: string } => {
+    const check = validateWorkspaceBackupSchema(rawJson);
+    if (!check.valid || !check.payload) {
+      return { valid: false, error: check.error };
+    }
+    const p = check.payload;
+    setProjects(p.projects);
+    setPriorityProjectId(p.priorityProjectId);
+    setProjectMilestones(p.projectMilestones);
+    setRoutine(p.routine);
+    if (Array.isArray(p.habitLogs)) {
+      setHabitLogs(p.habitLogs);
+    }
+    setReelHub(p.reelHub);
+    showToast('Workspace backup validated & restored to localStorage');
+    return { valid: true };
+  };
 
   const [scoutItems, setScoutItems] = useState<ScoutItem[]>([
     {
@@ -491,8 +764,8 @@ export default function App() {
   ]);
 
   const [latestDispatch, setLatestDispatch] = useState<OrchestratorDispatchResult | null>({
-    summary: 'Agent Harness executed tool trace across Notion MCP & Routine Planner.',
-    circadianVerdict: `Primary Peak window configured (${String(routine.morningPeakStart).padStart(2, '0')}:00 - ${String(routine.morningPeakEnd).padStart(2, '0')}:00). Deep work protection active.`,
+    summary: 'Simulated Agent Harness trace across Notion MCP & Routine Planner.',
+    circadianVerdict: `Primary Peak window configured (${String(routine.morningPeakStart).padStart(2, '0')}:00 - ${String(routine.morningPeakEnd).padStart(2, '0')}:00). Scheduling display active.`,
     twitterInsights: [
       'Capped 3-pass critique loops prevent self-congratulatory score inflation in agent harnesses.',
       'Structured milestone checklists provide stronger execution signal than passive dashboard scores.',
@@ -508,8 +781,8 @@ export default function App() {
       },
     ],
     inboxStrat: `Batch incoming emails and low-friction triage during your ${String(routine.slumpStart).padStart(2, '0')}:00 - ${String(routine.slumpEnd).padStart(2, '0')}:00 slump window.`,
-    digitalTwinCalibration: 'Week 6 heuristic index: 78.4% habit consistency across 117 logged sessions.',
-    preliminaryStrategy: `Focus on Today's Priority milestones during ${String(routine.morningPeakStart).padStart(2, '0')}:00 - ${String(routine.morningPeakEnd).padStart(2, '0')}:00. Sync progress to Notion MCP.`,
+    digitalTwinCalibration: 'Concept preview: 78.4% habit consistency across logged sessions.',
+    preliminaryStrategy: `Focus on Today's Priority milestones during ${String(routine.morningPeakStart).padStart(2, '0')}:00 - ${String(routine.morningPeakEnd).padStart(2, '0')}:00.`,
   });
 
   const [latestLoop, setLatestLoop] = useState<{
@@ -529,62 +802,6 @@ export default function App() {
       finalScore: initialRun.finalScore,
     };
   });
-
-  // Cognitive Habit Telemetry state
-  const [habitLogs, setHabitLogs] = useState<CognitiveHabitLog[]>([
-    {
-      id: 'habit-1',
-      name: 'Morning Peak Multi-Agent Kernel Coding',
-      category: 'coding',
-      durationMinutes: 90,
-      timestamp: 'Today at 09:30 AM',
-      hour: 9,
-      circadianAlignment: 'peak_aligned',
-      impactFidelityDelta: 0.65,
-      qualityScore: 10,
-      notes: 'Completed 3 priority milestones with zero context switching.',
-      tags: ['coding', 'gemini', 'kernel'],
-    },
-    {
-      id: 'habit-2',
-      name: 'arXiv Paper: Episodic Memory in Long-Context LLMs',
-      category: 'reading',
-      durationMinutes: 45,
-      timestamp: 'Today at 11:15 AM',
-      hour: 11,
-      circadianAlignment: 'peak_aligned',
-      impactFidelityDelta: 0.40,
-      qualityScore: 9,
-      notes: 'Extracted key principles of episodic decay vs permanent heuristic consolidation.',
-      tags: ['reading', 'research'],
-    },
-    {
-      id: 'habit-3',
-      name: 'Slump-Window Non-Sleep Deep Rest (NSDR)',
-      category: 'rest',
-      durationMinutes: 25,
-      timestamp: 'Today at 02:15 PM',
-      hour: 14,
-      circadianAlignment: 'slump_protected',
-      impactFidelityDelta: 0.35,
-      qualityScore: 8,
-      notes: 'Quarantined incoming messages; completed recovery reset.',
-      tags: ['rest', 'recovery'],
-    },
-    {
-      id: 'habit-4',
-      name: 'Subagent Dispatch Trade-Off Reflection',
-      category: 'reflection',
-      durationMinutes: 20,
-      timestamp: 'Yesterday at 08:30 PM',
-      hour: 20,
-      circadianAlignment: 'neutral',
-      impactFidelityDelta: 0.25,
-      qualityScore: 9,
-      notes: 'Logged daily decision heuristics for priority ordering.',
-      tags: ['reflection', 'heuristics'],
-    },
-  ]);
 
   const habitTelemetry = aggregateHabitTelemetry(habitLogs);
   const circadianProfile: CircadianSlot[] = calculateCircadianProfile(
@@ -620,7 +837,7 @@ export default function App() {
       })
       .catch((err) => console.warn('Codified prompt fetch note:', err));
 
-    // Global keyboard listener for shortcuts (1-9, ⌘K)
+    // Global keyboard listener for shortcuts (1-9, 0, ⌘K)
     const handleKeyDown = (e: KeyboardEvent) => {
       if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') {
         e.preventDefault();
@@ -633,12 +850,13 @@ export default function App() {
         if (e.key === '1') setCurrentTab('focus');
         else if (e.key === '2') setCurrentTab('projects');
         else if (e.key === '3') setCurrentTab('circadian');
-        else if (e.key === '4') setCurrentTab('swarm');
-        else if (e.key === '5') setCurrentTab('mcp');
+        else if (e.key === '4') setCurrentTab('reels');
+        else if (e.key === '5') setCurrentTab('habits');
         else if (e.key === '6') setCurrentTab('loop');
-        else if (e.key === '7') setCurrentTab('habits');
-        else if (e.key === '8') setCurrentTab('twin');
-        else if (e.key === '9') setCurrentTab('scout');
+        else if (e.key === '7') setCurrentTab('swarm');
+        else if (e.key === '8') setCurrentTab('mcp');
+        else if (e.key === '9') setCurrentTab('twin');
+        else if (e.key === '0') setCurrentTab('scout');
       }
     };
 
@@ -756,19 +974,19 @@ export default function App() {
     );
   };
 
-  // MCP & Notion Handlers
+  // MCP & Notion Handlers (Simulated)
   const handleToggleMCPServer = (serverId: string) => {
     setMcpServers((prev) =>
       prev.map((s) => {
         if (s.id === serverId) {
           const nextStatus = s.status === 'connected' ? 'disconnected' : 'connected';
           showToast(
-            `${s.name}: ${nextStatus === 'connected' ? 'Connected to Sandbox' : 'Disconnected'}`
+            `${s.name}: ${nextStatus === 'connected' ? 'Connected (Simulation / Demo)' : 'Disconnected'}`
           );
           return {
             ...s,
             status: nextStatus,
-            lastSynced: nextStatus === 'connected' ? 'Just now' : 'Paused',
+            lastSynced: nextStatus === 'connected' ? 'Simulated just now' : 'Paused',
           };
         }
         return s;
@@ -785,13 +1003,13 @@ export default function App() {
       title,
       database,
       status: 'Synced',
-      lastEdited: 'Just now (Sandbox)',
+      lastEdited: 'Simulated (Sandbox)',
       url: `https://notion.so/shaurya/${title.toLowerCase().replace(/[^a-z0-9]+/g, '-')}`,
       linkedProjectId: priorityProjectId,
     };
     setNotionPages((prev) => [newPage, ...prev]);
     setTotalInteractions((prev) => prev + 1);
-    showToast(`Created Notion sandbox page: ${newPage.title}`);
+    showToast(`Created simulated Notion page: ${newPage.title}`);
   };
 
   const handleSyncNotion = async (workspaceName: string, databaseId: string) => {
@@ -814,7 +1032,7 @@ export default function App() {
       title: `${proj.title} (${proj.progress}% Complete)`,
       database: idx === 0 ? 'Projects Roadmap' : idx === 1 ? 'AI Research Vault' : 'Daily Focus Journal',
       status: 'Synced',
-      lastEdited: 'Synced just now',
+      lastEdited: 'Simulated sync just now',
       url: `https://notion.so/shaurya/${proj.id}`,
       linkedProjectId: proj.id,
     }));
@@ -826,7 +1044,7 @@ export default function App() {
           ? {
               ...s,
               workspaceName,
-              lastSynced: 'Just now',
+              lastSynced: 'Simulated just now',
               syncedItemsCount: syncedPages.length + 21,
               status: 'connected',
             }
@@ -834,7 +1052,7 @@ export default function App() {
       )
     );
     setTotalInteractions((prev) => prev + 1);
-    showToast(`Synced ${projects.length} projects with Notion MCP (${workspaceName})`);
+    showToast(`Simulated Notion sync for ${projects.length} projects`);
   };
 
   const handleDispatch = async (mode = 'daily_pulse', goal = '') => {
@@ -854,7 +1072,7 @@ export default function App() {
       if (data.dispatch) setLatestDispatch(data.dispatch);
       if (data.loopResult) setLatestLoop(data.loopResult);
       setTotalInteractions((prev) => prev + 1);
-      showToast('Agent Harness completed tool trace & critique check');
+      showToast('Simulated Agent Harness trace completed');
     } catch (err) {
       console.error('Dispatch failed, executing local loop:', err);
       const localLoop = executeLoopUntilThreshold(
@@ -864,7 +1082,7 @@ export default function App() {
         3
       );
       setLatestLoop(localLoop);
-      showToast(`Local critique check complete (Score: ${localLoop.finalScore}/10, max 3 passes)`);
+      showToast(`Critique check complete (Score: ${localLoop.finalScore}/10, max 3 passes)`);
     } finally {
       setIsDispatching(false);
     }
@@ -1046,6 +1264,31 @@ export default function App() {
           onToggleMobileMenu={() => setIsMobileMenuOpen((prev) => !prev)}
         />
 
+        {/* Global Local-Only Storage & Intended Integrations Strip */}
+        <div className="bg-[#060606] border-b border-white/[0.07] px-3.5 py-2 sm:px-6 flex flex-wrap items-center justify-between gap-2 text-[11px] font-mono-studio text-neutral-400 shrink-0">
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="px-2 py-0.5 rounded bg-emerald-500/15 text-emerald-400 border border-emerald-500/30 font-bold">
+              LOCALSTORAGE ONLY: {storageStats.usedKB} KB / {storageStats.limitKB} KB
+            </span>
+            <span className="hidden md:inline text-neutral-500">
+              Clearing browser data resets local state unless backed up.
+            </span>
+            <button
+              type="button"
+              onClick={() => setCurrentTab('reels')}
+              className="underline text-white hover:text-emerald-400"
+            >
+              Open Reel Hub &amp; Backup →
+            </button>
+          </div>
+          <div className="hidden lg:flex items-center gap-1.5 text-[10px]">
+            <span className="text-amber-400 uppercase font-bold">
+              Intended · Not Connected:
+            </span>
+            <span>Jarvis · Codex/ChatGPT · Claude · MiniMe · Hermes</span>
+          </div>
+        </div>
+
         {/* Scrollable View Area */}
         <main className="flex-1 overflow-y-auto px-3.5 py-4 sm:px-6 sm:py-8 pb-28 lg:pb-8">
           <div className="max-w-6xl mx-auto space-y-8">
@@ -1100,6 +1343,17 @@ export default function App() {
                 projects={projects}
                 routine={routine}
                 onUpdateRoutine={handleUpdateRoutine}
+              />
+            )}
+
+            {currentTab === 'reels' && (
+              <ReelHub
+                reelHub={reelHub}
+                onUpdateReelHub={setReelHub}
+                storageStats={storageStats}
+                onExportBackupJson={handleExportBackupJson}
+                onImportBackupJson={handleImportBackupJson}
+                onShowToast={showToast}
               />
             )}
 
@@ -1208,20 +1462,21 @@ export default function App() {
         onClose={() => setShowArchModal(false)}
         codifiedPrompt={
           codifiedPromptText ||
-          `# COGNIBRAIN: AGENT & TOOL HARNESS ARCHITECTURE SPECIFICATION
+          `# COGNIBRAIN: PERSONAL EXECUTION, REEL HUB & AGENT HARNESS SPECIFICATION
 =============================================================================
 AUTHOR: Shaurya Studio (Shaurya Singh)
 CORE WORKFLOW: 01. Projects -> 02. Today's Priority -> 03. Milestone Completion
+REEL HUB MODULE: Source Inbox -> Sourced Ideas -> Scripts & Carousels -> Shoot/Edit Queue -> Results Log
 CRITIQUE PROTOCOL: Bounded 3-Pass Heuristic Checklist (Non-Proof Planning Aid)
 
-## 1. CORE EXECUTION HARNESS
-- [01. Core Workflow] Projects Board -> Today's Priority -> Milestone Checklist
-- [02. Routine Config] Adjustable Focus Windows (Primary Peak, Slump Triage, Secondary Peak)
-- [03. MCP Sandbox] Local JSON-RPC 2.0 tool bridge for Notion, GitHub, and Calendar
+## 1. LIVE LOCAL WORKFLOWS (MANUAL-FIRST, LOCALSTORAGE PERSISTED)
+- Projects Board, Today's Priority & Milestones, Routine & Focus Windows (Display), Focus Timer, Habit Logger
+- Reel Hub Content Pipeline (Source Inbox, Provenance & Dedup Ideas, Script/Carousel Editor with 3 mandatory governance fields, Shoot/Edit Queue with inline blockers, Real Metrics Results Log & Weekly Markdown Export, Seed Markdown Import & Schema-Validated JSON Backup)
 
-## 2. HONEST TELEMETRY & SIMULATION BOUNDARIES
-- Critique scores and habit consistency percentages are heuristic planning aids, never formal proof.
-- External feeds and MCP tool calls run in a deterministic local sandbox unless live credentials are provided.`
+## 2. HONEST SIMULATION & FUTURE INTEGRATION LABELS
+- SwarmDeck traces, MCP server toggles/Notion sync, and Research Radar are explicitly labelled as Simulation / Demo.
+- Persona Sandbox (16-week calibration) is labelled as a Concept Preview and collapsed by default.
+- Future integrations (Jarvis, Codex/ChatGPT, Claude, MiniMe, Hermes) are shown as "Intended · Not Connected" awaiting explicit go-ahead.`
         }
       />
 

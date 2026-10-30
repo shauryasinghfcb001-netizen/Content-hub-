@@ -206,6 +206,22 @@ export const MCPHub: React.FC<MCPHubProps> = ({
         </div>
       </section>
 
+      {/* P0 Honest Status Banner: MCP & Notion Simulation Notice */}
+      <div
+        data-testid="mcp-simulation-banner"
+        className="p-4 rounded-xl bg-amber-500/10 border border-amber-500/30 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs font-mono-studio text-amber-200"
+      >
+        <div>
+          <span className="px-2 py-0.5 rounded bg-amber-500/20 text-amber-300 font-bold mr-2 uppercase">
+            SIMULATION / DEMO
+          </span>
+          <strong>Honest Status Label:</strong> MCP server toggles, Notion two-way sync, page creation, and the JSON-RPC 2.0 inspector are local simulations. Live external connections are deferred until explicitly authorized.
+        </div>
+        <span className="text-[10px] text-amber-300/80 uppercase shrink-0">
+          STATUS: SIMULATED SANDBOX
+        </span>
+      </div>
+
       {/* SECTION 01: MCP SERVER REGISTRY & QUICK NOTION BRIDGE */}
       {activeSection === 'servers' && (
         <div className="space-y-8">

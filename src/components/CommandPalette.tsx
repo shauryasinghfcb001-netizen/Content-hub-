@@ -74,7 +74,7 @@ export const CommandPalette: React.FC<CommandPaletteProps> = ({
     },
     {
       id: 'nav-circadian',
-      label: 'Navigate: Routine & Adjustable Focus Windows',
+      label: 'Navigate: Routine & Adjustable Focus Windows (Display)',
       category: '01. Core Workflow',
       shortcut: '3',
       icon: <Activity className="w-4 h-4 text-neutral-400" />,
@@ -84,10 +84,21 @@ export const CommandPalette: React.FC<CommandPaletteProps> = ({
       },
     },
     {
-      id: 'nav-swarm',
-      label: 'Navigate: Agent & Tool Harness Console',
-      category: '02. Agent Harness & MCP',
+      id: 'nav-reels',
+      label: 'Navigate: Reel Hub Content Pipeline (Sources → Scripts → Queue → Results)',
+      category: '01. Core Workflow',
       shortcut: '4',
+      icon: <Target className="w-4 h-4 text-emerald-400" />,
+      action: () => {
+        onSelectTab('reels');
+        onClose();
+      },
+    },
+    {
+      id: 'nav-swarm',
+      label: 'Navigate: Agent & Tool Harness Console (Simulation / Demo)',
+      category: '02. Simulation / Demo Previews',
+      shortcut: '7',
       icon: <BrainCircuit className="w-4 h-4 text-neutral-400" />,
       action: () => {
         onSelectTab('swarm');

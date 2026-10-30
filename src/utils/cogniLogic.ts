@@ -892,5 +892,416 @@ export function buildHarnessExecutionTrace(
   return steps;
 }
 
+import type {
+  IntendedIntegration,
+  ReelSourceInboxItem,
+  ReelIdeaItem,
+  ReelScriptItem,
+  CarouselSlideItem,
+  ReelQueueItem,
+  ReelResultLogItem,
+  ReelCadenceConfig,
+  ReelContentFormat,
+  CogniBrainBackupPayload,
+} from '../types';
+
+/**
+ * Returns the 5 intended future integrations (Jarvis, Codex/ChatGPT, Claude, MiniMe, Hermes)
+ * honestly marked as "Intended · Not Connected" until explicitly authorized and wired.
+ */
+export function getIntendedFutureIntegrations(): IntendedIntegration[] {
+  return [
+    {
+      id: 'jarvis',
+      name: 'Jarvis',
+      roleDescription: 'Voice & executive orchestration layer',
+      status: 'intended_not_connected',
+      statusLabel: 'Intended · Not Connected',
+      activationRule: 'Requires explicit go-ahead before live wiring.',
+    },
+    {
+      id: 'codex',
+      name: 'Codex / ChatGPT',
+      roleDescription: 'Code synthesis & structured reasoning harness',
+      status: 'intended_not_connected',
+      statusLabel: 'Intended · Not Connected',
+      activationRule: 'Requires explicit go-ahead before live wiring.',
+    },
+    {
+      id: 'claude',
+      name: 'Claude',
+      roleDescription: 'Long-context drafting & script critique partner',
+      status: 'intended_not_connected',
+      statusLabel: 'Intended · Not Connected',
+      activationRule: 'Requires explicit go-ahead before live wiring.',
+    },
+    {
+      id: 'minime',
+      name: 'MiniMe',
+      roleDescription: 'Personal style & decision preference mirror',
+      status: 'intended_not_connected',
+      statusLabel: 'Intended · Not Connected',
+      activationRule: 'Requires explicit go-ahead before live wiring.',
+    },
+    {
+      id: 'hermes',
+      name: 'Hermes',
+      roleDescription: 'Cross-channel dispatch & notification courier',
+      status: 'intended_not_connected',
+      statusLabel: 'Intended · Not Connected',
+      activationRule: 'Requires explicit go-ahead before live wiring.',
+    },
+  ];
+}
+
+/**
+ * Normalizes a source URL for exact-match deduplication while preserving path/query semantics.
+ */
+export function normalizeSourceUrl(url: string): string {
+  const trimmed = (url || '').trim();
+  if (!trimmed) return '';
+  return trimmed.replace(/\/+$/, '').toLowerCase();
+}
+
+/**
+ * Evaluates whether a pasted source URL is an exact duplicate in the Source Inbox or Idea List.
+ * Flags exact re-pastes while allowing multiple distinct angles linked to the same source.
+ */
+export function evaluateSourceUrlDedup(
+  url: string,
+  existingSourceItems: ReelSourceInboxItem[],
+  existingIdeas: ReelIdeaItem[]
+): {
+  normalizedUrl: string;
+  isDuplicateInInbox: boolean;
+  matchingInboxItemId?: string;
+  isDuplicateInIdeas: boolean;
+  matchingIdeaIds: string[];
+  nextAngleIndex: number;
+} {
+  const normalizedUrl = normalizeSourceUrl(url);
+  if (!normalizedUrl) {
+    return {
+      normalizedUrl: '',
+      isDuplicateInInbox: false,
+      isDuplicateInIdeas: false,
+      matchingIdeaIds: [],
+      nextAngleIndex: 1,
+    };
+  }
+
+  const matchingInbox = existingSourceItems.find(
+    (item) => normalizeSourceUrl(item.url) === normalizedUrl
+  );
+  const matchingIdeas = existingIdeas.filter(
+    (idea) => normalizeSourceUrl(idea.sourceUrl) === normalizedUrl
+  );
+  const matchingIdeaIds = matchingIdeas.map((i) => i.id);
+
+  return {
+    normalizedUrl,
+    isDuplicateInInbox: Boolean(matchingInbox),
+    matchingInboxItemId: matchingInbox?.id,
+    isDuplicateInIdeas: matchingIdeaIds.length > 0,
+    matchingIdeaIds,
+    nextAngleIndex: matchingIdeaIds.length + 1,
+  };
+}
+
+/**
+ * Parses supplied Markdown of draft scripts into ReelScriptItem records.
+ * Preserves every draft/demo flag ([draft], [needs tool run], [needs source check]),
+ * and keeps all imported scripts explicitly labelled as status: 'draft' and isSeedDraft: true.
+ */
+export function parseSeedScriptsMarkdown(
+  markdownText: string,
+  defaultSlidesCount = 6,
+  defaultDurationSec = 60
+): ReelScriptItem[] {
+  const cleaned = (markdownText || '').trim();
+  if (!cleaned) return [];
+
+  // Split by top-level `# ` or `## ` headings or `---` separators
+  const rawSections = cleaned
+    .split(/\n(?=#{1,2}\s+|\s*---\s*\n)/g)
+    .map((s) => s.replace(/^\s*---\s*/, '').trim())
+    .filter(Boolean);
+
+  const todayStr = new Date().toISOString().split('T')[0];
+
+  return rawSections.map((section, idx) => {
+    const lines = section.split('\n').map((l) => l.trim());
+    const headingLine = lines[0]?.replace(/^#{1,3}\s*/, '').trim() || `Imported Draft Script #${idx + 1}`;
+
+    const lowerSection = section.toLowerCase();
+    const needsToolRun =
+      lowerSection.includes('needs tool run') ||
+      lowerSection.includes('[needs-tool-run]') ||
+      lowerSection.includes('flag: tool run');
+    const needsSourceCheck =
+      lowerSection.includes('needs source check') ||
+      lowerSection.includes('[needs-source-check]') ||
+      lowerSection.includes('flag: source check');
+
+    // Clean flag brackets from display title while keeping the flags on the record
+    const cleanTitle = headingLine
+      .replace(
+        /\[(draft|carousel|reel|long_video|long video|x_clip|x clip|needs tool run|needs source check|needs-tool-run|needs-source-check)\]/gi,
+        ''
+      )
+      .trim() || `Imported Draft Script #${idx + 1}`;
+
+    let format: ReelContentFormat = 'reel';
+    if (lowerSection.includes('format: carousel') || lowerSection.includes('[carousel]')) {
+      format = 'carousel';
+    } else if (lowerSection.includes('format: long_video') || lowerSection.includes('format: long video')) {
+      format = 'long_video';
+    } else if (lowerSection.includes('format: x_clip') || lowerSection.includes('format: x clip')) {
+      format = 'x_clip';
+    }
+
+    const extractField = (labelRegex: RegExp, fallback: string): string => {
+      const match = section.match(labelRegex);
+      return match && match[1] ? match[1].trim() : fallback;
+    };
+
+    const hook = extractField(
+      /(?:^|\n)\s*(?:\*\*|)?hook(?:\*\*|)?:\s*(.+)/i,
+      `Draft hook for ${cleanTitle}`
+    );
+    const spokenScript = extractField(
+      /(?:^|\n)\s*(?:\*\*|)?(?:spoken\s*script|script|body)(?:\*\*|)?:\s*([\s\S]+?)(?=\n\s*(?:\*\*|)?(?:slides|checked|avoid|flags|source)(?:\*\*|LL)?:|$)/i,
+      lines.slice(1).join('\n').trim() || 'Draft spoken script pending refinement.'
+    );
+    const checked = extractField(
+      /(?:^|\n)\s*(?:\*\*|)?checked(?:\*\*|)?:\s*(.+)/i,
+      needsSourceCheck ? 'Pending source check' : 'Imported seed draft — verify before shoot'
+    );
+    const avoid = extractField(
+      /(?:^|\n)\s*(?:\*\*|)?avoid(?:\*\*|)?:\s*(.+)/i,
+      'Do not claim unverified benchmarks or live automation without proof'
+    );
+    const sourceUrl = extractField(/(?:^|\n)\s*(?:\*\*|)?source(?:\*\*|)?:\s*(https?:\/\/\S+)/i, '');
+
+    // Extract slide lines starting with `- Slide` or `Slide N:`
+    const slideMatches = Array.from(
+      section.matchAll(/(?:^|\n)\s*(?:-\s*)?Slide\s*(\d+)\s*:\s*([^|\n]+)(?:\|\s*(.+))?/gi)
+    );
+
+    const carouselSlides: CarouselSlideItem[] =
+      slideMatches.length > 0
+        ? slideMatches.map((m, sIdx) => ({
+            id: `seed-slide-${idx}-${sIdx + 1}`,
+            slideNumber: Number(m[1]) || sIdx + 1,
+            headline: m[2].trim(),
+            body: (m[3] || 'Draft slide point').trim(),
+          }))
+        : Array.from({ length: Math.max(2, Math.min(10, defaultSlidesCount)) }, (_, sIdx) => ({
+            id: `seed-slide-${idx}-${sIdx + 1}`,
+            slideNumber: sIdx + 1,
+            headline: sIdx === 0 ? hook : `Slide ${sIdx + 1} Key Point`,
+            body: sIdx === 0 ? 'Cover slide hook' : 'Supporting point from draft script',
+          }));
+
+    return {
+      id: `seed-script-${Date.now()}-${idx + 1}`,
+      title: cleanTitle,
+      format,
+      hook,
+      spokenScript,
+      carouselSlides,
+      status: 'draft',
+      checked,
+      checkedDate: todayStr,
+      avoid,
+      needsToolRun,
+      needsSourceCheck,
+      isSeedDraft: true,
+      targetDurationSec: defaultDurationSec,
+      sourceUrl: sourceUrl || undefined,
+      updatedAt: todayStr,
+    };
+  });
+}
+
+/**
+ * Orders Shoot/Edit Queue items with Today's Priority first while keeping
+ * all blocked items 100% visible inline with their reason (never dropped or hidden).
+ */
+export function sortReelQueueItems(queue: ReelQueueItem[]): ReelQueueItem[] {
+  if (!Array.isArray(queue)) return [];
+  const stageWeight: Record<ReelQueueItem['stage'], number> = {
+    to_shoot: 1,
+    to_edit: 2,
+    ready_to_post: 3,
+    blocked: 4, // Kept visible in queue with inline reason
+    completed: 5,
+  };
+
+  return [...queue].sort((a, b) => {
+    if (a.isTodayPriority !== b.isTodayPriority) {
+      return a.isTodayPriority ? -1 : 1;
+    }
+    return (stageWeight[a.stage] || 99) - (stageWeight[b.stage] || 99);
+  });
+}
+
+/**
+ * Generates a weekly Markdown export summarizing real manual metrics per posted reel/carousel/video.
+ */
+export function exportWeeklyResultsMarkdown(
+  results: ReelResultLogItem[],
+  cadence: ReelCadenceConfig
+): string {
+  const safeResults = Array.isArray(results) ? results : [];
+  const totalViews = safeResults.reduce((sum, r) => sum + (Number(r.views) || 0), 0);
+  const totalLikes = safeResults.reduce((sum, r) => sum + (Number(r.likes) || 0), 0);
+  const totalComments = safeResults.reduce((sum, r) => sum + (Number(r.comments) || 0), 0);
+  const totalSends = safeResults.reduce((sum, r) => sum + (Number(r.sends) || 0), 0);
+
+  const reelsCount = safeResults.filter((r) => r.format === 'reel').length;
+  const carouselsCount = safeResults.filter((r) => r.format === 'carousel').length;
+  const longVideosCount = safeResults.filter((r) => r.format === 'long_video').length;
+
+  const header = [
+    `# CogniBrain · Reel Hub Weekly Results Export`,
+    `Generated: ${new Date().toISOString().split('T')[0]}`,
+    ``,
+    `## Cadence Target vs. Logged Posts`,
+    `- **Original Reels**: ${reelsCount} posted (Target: ${cadence.dailyReelsTarget}/day over ${cadence.sprintDays}-day sprint)`,
+    `- **Carousels**: ${carouselsCount} posted (Target: ${cadence.dailyCarouselsTarget}/day · ${
+      cadence.carouselsTermConfirmed ? 'Confirmed' : 'Read from "consoles" — pending confirmation'
+    })`,
+    `- **Long-Form Videos**: ${longVideosCount} posted (Target: ${cadence.weeklyLongVideosMin}–${cadence.weeklyLongVideosMax}/week)`,
+    ``,
+    `## Aggregate Real Metrics (Manual Entry)`,
+    `- **Total Posts Logged**: ${safeResults.length}`,
+    `- **Views**: ${totalViews.toLocaleString()}`,
+    `- **Likes**: ${totalLikes.toLocaleString()}`,
+    `- **Comments**: ${totalComments.toLocaleString()}`,
+    `- **Sends / Shares**: ${totalSends.toLocaleString()}`,
+    ``,
+    `## Per-Post Breakdown`,
+    `| Date | Title | Format | Views | Likes | Comments | Sends | Notes |`,
+    `| :--- | :--- | :--- | ---: | ---: | ---: | ---: | :--- |`,
+  ];
+
+  const rows =
+    safeResults.length > 0
+      ? safeResults.map(
+          (r) =>
+            `| ${r.postedDate} | ${r.title.replace(/\|/g, '/')} | ${r.format} | ${r.views} | ${r.likes} | ${r.comments} | ${r.sends} | ${(r.notes || '-').replace(/\|/g, '/')} |`
+        )
+      : [`| - | No posted results logged yet | - | 0 | 0 | 0 | 0 | - |`];
+
+  return [...header, ...rows].join('\n');
+}
+
+/**
+ * Estimates localStorage byte usage against the standard 5,120 KB (5 MB) browser limit.
+ */
+export function estimateLocalStorageBytes(
+  storageEntries: Record<string, string>,
+  maxLimitKB = 5120
+): {
+  usedBytes: number;
+  usedKB: number;
+  limitKB: number;
+  usagePercent: number;
+} {
+  let totalChars = 0;
+  for (const [k, v] of Object.entries(storageEntries || {})) {
+    totalChars += (k?.length || 0) + (v?.length || 0);
+  }
+  // UTF-16 in browser localStorage uses 2 bytes per character
+  const usedBytes = totalChars * 2;
+  const usedKB = Math.round((usedBytes / 1024) * 10) / 10;
+  const usagePercent = Math.min(100, Math.round((usedKB / maxLimitKB) * 1000) / 10);
+
+  return {
+    usedBytes,
+    usedKB,
+    limitKB: maxLimitKB,
+    usagePercent,
+  };
+}
+
+/**
+ * Validates an imported backup JSON string against CogniBrainBackupPayload schema
+ * so a cleared browser can safely restore state without corrupting localStorage.
+ */
+export function validateWorkspaceBackupSchema(rawJson: string): {
+  valid: boolean;
+  error?: string;
+  payload?: CogniBrainBackupPayload;
+} {
+  if (!rawJson || !rawJson.trim()) {
+    return { valid: false, error: 'Backup JSON is empty.' };
+  }
+
+  let parsed: any;
+  try {
+    parsed = JSON.parse(rawJson);
+  } catch {
+    return { valid: false, error: 'Invalid JSON syntax in backup file.' };
+  }
+
+  if (!parsed || typeof parsed !== 'object') {
+    return { valid: false, error: 'Backup root must be a JSON object.' };
+  }
+
+  if (parsed.schemaVersion !== 'cognibrain-backup-v1') {
+    return {
+      valid: false,
+      error: `Unsupported or missing schemaVersion (expected "cognibrain-backup-v1", got "${String(parsed.schemaVersion)}").`,
+    };
+  }
+
+  if (!Array.isArray(parsed.projects)) {
+    return { valid: false, error: 'Missing or invalid "projects" array in backup.' };
+  }
+
+  if (typeof parsed.priorityProjectId !== 'string') {
+    return { valid: false, error: 'Missing or invalid "priorityProjectId" string in backup.' };
+  }
+
+  if (!parsed.projectMilestones || typeof parsed.projectMilestones !== 'object') {
+    return { valid: false, error: 'Missing or invalid "projectMilestones" map in backup.' };
+  }
+
+  if (!parsed.routine || typeof parsed.routine.wakeHour !== 'number') {
+    return { valid: false, error: 'Missing or invalid "routine" configuration in backup.' };
+  }
+
+  const rh = parsed.reelHub;
+  if (!rh || typeof rh !== 'object') {
+    return { valid: false, error: 'Missing "reelHub" module state in backup.' };
+  }
+
+  const requiredArrays: Array<keyof typeof rh> = [
+    'sources',
+    'sourceItems',
+    'ideas',
+    'scripts',
+    'queue',
+    'results',
+  ];
+  for (const key of requiredArrays) {
+    if (!Array.isArray(rh[key])) {
+      return { valid: false, error: `Missing or invalid "reelHub.${String(key)}" array in backup.` };
+    }
+  }
+
+  if (!rh.cadenceConfig || typeof rh.cadenceConfig.dailyReelsTarget !== 'number') {
+    return { valid: false, error: 'Missing or invalid "reelHub.cadenceConfig" in backup.' };
+  }
+
+  return {
+    valid: true,
+    payload: parsed as CogniBrainBackupPayload,
+  };
+}
+
+
 
 

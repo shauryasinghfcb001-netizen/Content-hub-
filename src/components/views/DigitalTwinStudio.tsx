@@ -27,6 +27,7 @@ export const DigitalTwinStudio: React.FC<DigitalTwinStudioProps> = ({
   const [selectedScenarioIndex, setSelectedScenarioIndex] = useState<number>(0);
   const [customScenario, setCustomScenario] = useState<string>('');
   const [isSimulating, setIsSimulating] = useState<boolean>(false);
+  const [isCalibrationExpanded, setIsCalibrationExpanded] = useState<boolean>(false);
 
   const telemetry = aggregateHabitTelemetry(habitLogs);
 
@@ -83,66 +84,74 @@ export const DigitalTwinStudio: React.FC<DigitalTwinStudioProps> = ({
     <div className="space-y-8">
       {/* Header */}
       <section className="pb-6 border-b border-white/[0.08]">
-        <div className="flex items-center space-x-3 text-[11px] font-mono-studio text-neutral-400 uppercase tracking-widest mb-3">
-          <span className="text-neutral-500">PERSONA SANDBOX</span>
+        <div className="flex flex-wrap items-center gap-2 text-[11px] font-mono-studio text-neutral-400 uppercase tracking-widest mb-3">
+          <span className="px-2 py-0.5 rounded bg-amber-500/20 text-amber-300 border border-amber-500/30 font-bold">
+            CONCEPT / SIMULATION ONLY
+          </span>
           <span className="text-neutral-700">·</span>
-          <span className="text-amber-300">SIMULATED REPLY COMPARISON</span>
+          <span className="text-amber-300">16-WEEK CALIBRATION MECHANISM NOT YET DEFINED</span>
           <span className="text-neutral-700">·</span>
-          <span>HEURISTIC HABIT INDEX (NOT PROOF)</span>
+          <span>NOT A WORKING FEATURE YET</span>
         </div>
 
         <div className="flex flex-col md:flex-row md:items-end justify-between gap-6">
           <div>
             <h1 className="font-display text-3xl sm:text-5xl font-normal text-white tracking-tight leading-none">
-              Persona Simulation &amp; Habit Studio
+              Persona Sandbox (Concept Preview)
             </h1>
             <p className="mt-3 text-sm text-neutral-400 max-w-2xl leading-relaxed">
-              Test how your configured focus windows and communication rules shape drafted replies compared to an unconstrained prompt. The calibration percentage is a heuristic habit-consistency index, not proof of human equivalence.
+              Concept preview for how routine rules and logged habits could shape drafted replies in the future. Because the 16-week calibration mechanism is not implemented yet, it is collapsed by default below and shown strictly as a concept.
             </p>
           </div>
 
           <div className="flex items-center space-x-3">
             <button
               type="button"
-              onClick={onLogTelemetryInteraction}
-              className="px-5 py-2.5 rounded-xl border border-white/20 hover:border-white text-xs font-mono-studio uppercase tracking-wider text-white transition-all flex items-center space-x-2"
+              onClick={() => setIsCalibrationExpanded((prev) => !prev)}
+              className="px-4 py-2.5 rounded-xl border border-amber-500/30 bg-amber-500/10 hover:bg-amber-500/20 text-xs font-mono-studio uppercase tracking-wider text-amber-200 transition-all"
             >
-              <Zap className="w-3.5 h-3.5" />
-              <span>LOG TELEMETRY (+0.2%)</span>
+              {isCalibrationExpanded
+                ? 'Collapse 16-Week Concept'
+                : 'Expand 16-Week Concept (Collapsed by Default)'}
             </button>
           </div>
         </div>
 
-        {/* Honest Simulation Notice */}
-        <div className="mt-6 p-3.5 rounded-xl bg-amber-500/10 border border-amber-500/30 text-xs font-mono-studio text-amber-200">
-          <strong>Simulation Label:</strong> Side-by-side replies below are simulated drafts generated from your configured routine rules and communication templates. Use the percentage below as a habit-tracking heuristic, not formal proof.
+        {/* Honest Concept Notice */}
+        <div
+          data-testid="persona-concept-banner"
+          className="mt-6 p-3.5 rounded-xl bg-amber-500/10 border border-amber-500/30 text-xs font-mono-studio text-amber-200"
+        >
+          <strong>Concept Status Label:</strong> The 16-week Digital Twin calibration has no live training or fine-tuning mechanism yet—it is retained as a vision concept (collapsed by default) while manual habit logging remains active.
         </div>
 
-        {/* Week Scrubber */}
-        <div className="mt-6 pt-5 border-t border-white/[0.06] space-y-3">
-          <div className="flex items-center justify-between text-xs font-mono-studio">
-            <span className="text-neutral-400">
-              HEURISTIC PRESET STAGE: <strong className="text-white">WEEK {calibration.currentWeek}</strong> OF 16
-            </span>
-            <span className="text-white font-bold">
-              {calibration.digitalTwinFidelityScore}% HEURISTIC ALIGNMENT (EST.)
-            </span>
+        {/* Week Scrubber (Collapsed by Default) */}
+        {isCalibrationExpanded && (
+          <div className="mt-6 pt-5 border-t border-white/[0.06] space-y-3">
+            <div className="flex items-center justify-between text-xs font-mono-studio">
+              <span className="text-neutral-400">
+                CONCEPT STAGE PREVIEW: <strong className="text-white">WEEK {calibration.currentWeek}</strong> OF 16
+              </span>
+              <span className="text-amber-300 font-bold">
+                {calibration.digitalTwinFidelityScore}% CONCEPT INDEX (SIMULATED)
+              </span>
+            </div>
+            <input
+              type="range"
+              min="1"
+              max="16"
+              value={calibration.currentWeek}
+              onChange={(e) => onUpdateWeek(parseInt(e.target.value, 10))}
+              className="w-full accent-white cursor-pointer"
+            />
+            <div className="flex justify-between text-[10px] font-mono-studio text-neutral-500 uppercase tracking-wider">
+              <span>W1. Baseline (35%)</span>
+              <span>W5. Rules (65%)</span>
+              <span>W9. Co-Pilot (80%)</span>
+              <span>W16. Full Preset (98.6%)</span>
+            </div>
           </div>
-          <input
-            type="range"
-            min="1"
-            max="16"
-            value={calibration.currentWeek}
-            onChange={(e) => onUpdateWeek(parseInt(e.target.value, 10))}
-            className="w-full accent-white cursor-pointer"
-          />
-          <div className="flex justify-between text-[10px] font-mono-studio text-neutral-500 uppercase tracking-wider">
-            <span>W1. Baseline (35%)</span>
-            <span>W5. Rules (65%)</span>
-            <span>W9. Co-Pilot (80%)</span>
-            <span>W16. Full Preset (98.6%)</span>
-          </div>
-        </div>
+        )}
 
         {/* Sub-Navigation: Simulation vs Habit Telemetry */}
         <div className="flex flex-wrap items-center gap-2 pt-6">
